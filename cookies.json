@@ -1,7 +1,7 @@
 [
   {
-    "name": "wt2",
-    "value": "DoipJITG48EmZwmkeXNzGO9bES6fxsehTuj-kLnkMykd6-kN9CJZr6YNsEcaKyr2N8ON2XjRHZBPsmgyIOa6UFg~~",
+    "name": "HMACCOUNT",
+    "value": "4AC6193295AD6540",
     "domain": ".zhipin.com"
   },
   {
@@ -15,53 +15,33 @@
     "domain": ".zhipin.com"
   },
   {
-    "name": "Hm_lvt_194df3105ad7148dcf2b98a91b5e727a",
-    "value": "1783431368",
+    "name": "isOHPC",
+    "value": "1",
+    "domain": "www.zhipin.com"
+  },
+  {
+    "name": "Hm_lpvt_194df3105ad7148dcf2b98a91b5e727a",
+    "value": "1790756064",
     "domain": ".zhipin.com"
   },
   {
     "name": "ab_guid",
-    "value": "05d3016d-d1c7-471b-a8c4-4b36da3bb298",
+    "value": "e85379a1-21a2-4051-96bc-8e0edffdf9db",
     "domain": "www.zhipin.com"
   },
   {
-    "name": "wbg",
-    "value": "0",
-    "domain": ".zhipin.com"
-  },
-  {
-    "name": "HMACCOUNT",
-    "value": "0F7E008CE8A11E08",
-    "domain": ".zhipin.com"
-  },
-  {
-    "name": "bst",
-    "value": "V2RtgkFOP03lhoVtRuxxkcKSqy7DrRzS8~|RtgkFOP03lhoVtRuxxkcKSqy7DrUxyQ~",
-    "domain": ".zhipin.com"
-  },
-  {
-    "name": "__c",
-    "value": "1783431368",
+    "name": "Hm_lvt_194df3105ad7148dcf2b98a91b5e727a",
+    "value": "1790756064",
     "domain": ".zhipin.com"
   },
   {
     "name": "__a",
-    "value": "24226576.1783431368..1783431368.14.1.14.14",
+    "value": "13075986.1790756064..1790756064.2.1.2.2",
     "domain": ".zhipin.com"
   },
   {
-    "name": "__zp_stoken__",
-    "value": "ea62gwqE1BztYWR4FBWLCuHNyS0NvWnzCqgRFZ8K6VV5%2BQnTCp8KqQ8KlTVXCgsKowolmw73Cq8KFwr7CuErCuEHCncKmwp3CmsOxwqPCmsSZw63Cu0bCkcKDwr3Cgzkhwr%2FDvcS9xL%2FEusS6w6DDvcS%2FxLrEusOAxL3Ev8S6w67EgMOFxL%2FEusS6xL%2FEvcS%2FxLrEujw4OTk5MjA2wq9fOStdwrnDrT1AwrUfwrbDicK1wrrCuzfCuMOAwrYHThYgC1xYCQkHBgcNWwtYWFdWCwQIVggKBlhSWVVVWVdSWFkvMMK7woMqwr%2FCqwzCusOiC8K2aAbCvMOqMMOQVHAxQsK2w7gYLDvCmDo5N8K9xL06OT82QDo4PB8yOTwyNjsyPDwvNsK4esOPU280SMK5w6saMTc%2FPUA6ImA8OzQ2PDY7TjwyKjsxASo3wrzDq8K%2Fw482Ow%3D%3D",
-    "domain": ".zhipin.com"
-  },
-  {
-    "name": "Hm_lpvt_194df3105ad7148dcf2b98a91b5e727a",
-    "value": "1783433846",
-    "domain": ".zhipin.com"
-  },
-  {
-    "name": "zp_at",
-    "value": "emMG9C2vyMwCdTGaKfBNczuQVQ0HX3kuCTBpe_H8eqs~",
+    "name": "__c",
+    "value": "1790756064",
     "domain": ".zhipin.com"
   }
 ]

@@ -57,8 +57,8 @@ from DrissionPage import ChromiumPage
 class Config:
     """统一配置类"""
     # 搜索配置
-    job_name: str = "爬虫"  # 搜索的职位名称
-    city_name: str = "厦门"  # 搜索城市名称
+    job_name: str = "数据"  # 搜索的职位名称
+    city_name: str = "上海"  # 搜索城市名称
     city_code: str = ""  # 城市代码（自动获取）
     search_max_scrolls: int = 30  # 搜索页最大滚动次数（当前平台滚动最多加载300个职位卡片）
     search_wait_time: int = 60  # 搜索页等待时间，此时可以筛选条件（例如：学历，工作经验）
@@ -714,75 +714,34 @@ class JobScraper:
         if filename and job_id:
             self.html_save_count += 1
 
-    def search_jobs(self) -> List[Dict]:
-        """第一步：搜索职位列表（自动去重）"""
-        logger.info(f"=== 步骤1: 搜索职位 [{self.config.job_name}] 城市: [{self.config.city_name}] ===")
+    def navigate_to_jobs_page(self):
+        """第一步：导航到职位页"""
+        logger.info(f"=== 步骤1: 正在导航到职位页... [{self.config.job_name}] 城市: [{self.config.city_name}] ===")
 
         try:
-            # 访问首页
-            logger.info("正在访问BOSS直聘首页...")
-            self.page.get("https://www.zhipin.com/")
+            # 访问职位页
+            logger.info("正在访问BOSS直聘职位页...")
+            self.page.get("https://www.zhipin.com/web/geek/jobs")
             # 等待搜索框出现（匹配class或placeholder符合的input元素）
-            self.page.wait.ele_displayed('xpath://input[@class="ipt-search" or @placeholder="搜索职位、公司"]', timeout=10)
+            self.page.wait.ele_displayed('xpath://div[@class="expect-list has-add no-part"]', timeout=10)
 
             # 保存首页HTML
-            self.save_page_html("01_首页")
-
-            # 输入搜索词
-            logger.info("正在输入搜索关键词...")
-            # 获取搜索框元素
-            search_input = self.page.ele('xpath://input[@class="ipt-search" or @placeholder="搜索职位、公司"]', timeout=10)
-            if not search_input:
-                logger.error("未找到搜索框")
-                return []
-
-            self.page.scroll.to_see(search_input)  # 滚动到搜索框
-            search_input.clear()  # 清空搜索框
-            time.sleep(0.5)
-            search_input.input(self.config.job_name)  # 输入搜索词
-            time.sleep(0.5)
-            search_input.input('\n')  # 回车确认
-
-            # 等待搜索结果
-            time.sleep(1)  # 等待页面刷新
-            new_url = re.sub(r'city=\d+', f'city={self.config.city_code}', self.page.url) if self.config.city_code else self.page.url  # 替换城市代码
-            logger.info(f"正在访问搜索结果页: {new_url}")
-            self.page.get(new_url)
-            logger.info(f"等待 {self.config.search_wait_time} 秒，请开始你的条件筛选（例如：学历，工作经验）")
-            time.sleep(self.config.search_wait_time)
-            logger.info(f"搜索结果页URL未发生变化") if self.page.url == new_url else logger.info(f"搜索结果页URL发生变化: {self.page.url}")
-
-            # 保存搜索结果页HTML
-            self.save_page_html("02_搜索结果页")
-
-            # 滚动加载更多，直到达到最大滚动次数或没有更多职位
-            self._scroll_load()
-
-            # 保存滚动加载后的HTML
-            self.save_page_html("03_滚动加载后")
-
-            # 解析列表
-            jobs = self.parser.parse_job_list(self.page)
-
-            if jobs:
-                # 保存到实例变量
-                self.job_list = jobs
-                self.job_links = [job.get('职位详情链接') for job in jobs if job.get('职位详情链接')]
-
-                # 保存列表文件
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                filename = os.path.join(self.file_manager.data_dir,
-                                        f"{self.config.job_name}_list_{timestamp}.json")
-                self.file_manager.save_json(jobs, filename)
-                logger.info(f"职位列表已保存: {filename} (共 {len(jobs)} 个去重后职位)")
-
-            return jobs
+            self.save_page_html("01_职位首页")
 
         except Exception as e:
             logger.error(f"搜索职位失败: {e}")
             return []
 
-    def _scroll_load(self):
+    def get_expected_job_tabs(self):
+        """获取期待职位标签"""
+        # 定位容器并返回所有标签
+        container = self.page.ele('xpath://div[@class="expect-list has-add no-part"]', timeout=5)
+        if not container:
+            logger.warning("未找到期待职位列表容器")
+            return []
+        return container.eles('xpath:.//a[contains(@class, "expect-item")]', timeout=5)
+
+    def _scroll_load_for_tab(self):
         """滚动加载更多职位"""
         logger.info(f"开始滚动加载，最大滚动次数: {self.config.search_max_scrolls}")
 
@@ -797,7 +756,8 @@ class JobScraper:
             job_list = self.page.ele('xpath://ul[contains(@class, "rec-job-list")]', timeout=5)
             if job_list:
                 # 获取当前页职位数量：在job_list内部搜索所有class包含"job-card-box"的li元素，eles() 返回多个元素（列表）
-                current = len(job_list.eles('xpath:.//li[contains(@class, "job-card-box")]'))
+                cards = job_list.eles('xpath:.//li[contains(@class, "job-card-box")]')
+                current = len(cards)
                 logger.info(f"第{i + 1}次滚动后: {current}个职位")
 
                 if current > last_count:
@@ -810,6 +770,45 @@ class JobScraper:
                         break
 
             time.sleep(1)
+
+    def scrape_expected_jobs_mode(self):
+        """【新模式1】遍历期待职位标签进行采集"""
+        self.navigate_to_jobs_page()
+        tabs = self.get_expected_job_tabs()
+        logger.info(f"找到 {len(tabs)} 个期待职位标签")
+
+        for i, tab in enumerate(tabs):
+            tab_name = tab.ele('xpath:.//span').text
+            logger.info(f"正在采集标签: {tab_name} ({i+1}/{len(tabs)})")
+            
+            # 更新配置中的职位名称以匹配当前标签
+            self.config.job_name = tab_name
+            # 重新初始化文件管理器以创建新目录
+            self.file_manager = FileManager(self.config)
+            
+            tab.click()
+            time.sleep(3) # 等待页面刷新
+            
+            self._scroll_load_for_tab(self.config.max_jobs_per_type)
+            
+            jobs = self.parser.parse_job_list(self.page)
+            if jobs:
+                self.job_list = jobs
+                self.job_links = [job.get('职位详情链接') for job in jobs if job.get('职位详情链接')]
+                
+                # 保存列表
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = os.path.join(self.file_manager.data_dir, f"{tab_name}_list_{timestamp}.json")
+                self.file_manager.save_json(jobs, filename)
+                
+                # 采集详情
+                self.scrape_details()
+                self.save_results()
+            
+            # 恢复采集器状态
+            self.current_job_details = []
+            self.job_list = []
+            self.job_links = []
 
     def load_job_list_from_file(self, file_path: str = None) -> bool:
         """从文件加载职位列表"""
@@ -1049,20 +1048,9 @@ def main():
                 break
 
             if mode == "1":
-                # 完整模式：重新搜索
-                jobs = scraper.search_jobs()
-                if not jobs:
-                    logger.error("未获取到职位列表")
-                    return
-                # 采集详情
-                details = scraper.scrape_details()
-                # 保存结果
-                if details:
-                    scraper.save_results()
-                else:
-                    logger.warning("未采集到任何职位详情数据，请检查：")
-                    logger.warning("1. 网络连接是否稳定")
-                    logger.warning("2. 账号是否登录成功，未登录则需修改参数 cookie_refresh 为True，扫码重新登录账号")
+                # 完整模式：遍历期待职位并采集
+                scraper.scrape_expected_jobs_mode()
+                logger.info("所有期待职位采集完成")
                 return
 
             elif mode == "2":
