@@ -383,7 +383,7 @@ class JobParser:
 
     # 字段顺序定义（用于统一输出格式）
     FIELD_ORDER = [
-        '序号', '数据采集时间', '职位状态', '职位标题', '薪资', '工作城市', '工作区域', '工作地点',
+        '序号', '数据采集时间', '职位状态', '职位标题', '薪资', 'tag-icon', '全部标签', '工作城市', '工作区域', '工作地点',
         '经验要求', '学历要求', '岗位标签', '职位描述', '职位详情链接', '职位唯一ID', '公司名称',
         '公司详情链接', '融资情况', '公司规模', '所属行业', '招聘负责人', '活跃状态', '招聘者职位'
     ]
@@ -455,6 +455,16 @@ class JobParser:
 
         return ''
 
+    def decode_salary(self, salary: str) -> str:
+        """解码列表页薪资中的私有区数字字符。"""
+        if not salary:
+            return ''
+
+        return ''.join(
+            str(ord(char) - 0xE031) if 0xE031 <= ord(char) <= 0xE03A else char
+            for char in salary
+        ).strip()
+
     def parse_job_list(self, page: ChromiumPage) -> List[Dict]:
         """解析职位列表页（带去重功能）"""
         logger.info("开始解析职位列表")
@@ -500,6 +510,8 @@ class JobParser:
             '序号': index,
             '职位名称': '',
             '薪资': '',
+            'tag-icon': '',
+            '全部标签': [],
             '公司': '',
             '工作地点': '',
             '经验要求': '',
@@ -517,9 +529,14 @@ class JobParser:
             if href:
                 job['职位详情链接'] = 'https://www.zhipin.com' + href if not href.startswith('http') else href
 
-        # # 薪资（该页面的薪资是加密的，直接跳过）
-        # salary_elem = card.ele('xpath:.//span[contains(@class, "job-salary")]')
-        # job['薪资'] = self.clean_text(salary_elem.text)
+        # 薪资中的数字使用私有区字符编码，需要先还原为普通数字。
+        salary_elem = card.ele('xpath:.//span[contains(@class, "job-salary")]')
+        if salary_elem:
+            job['薪资'] = self.decode_salary(salary_elem.text)
+
+        tag_icon_elem = card.ele('xpath:.//img[contains(@class, "job-tag-icon")]')
+        if tag_icon_elem:
+            job['tag-icon'] = self.clean_text(tag_icon_elem.attr('alt') or '')
 
         # 公司
         company_elem = card.ele('xpath:.//span[contains(@class, "boss-name")]')
@@ -534,7 +551,8 @@ class JobParser:
         # 经验学历标签
         tag_list = card.ele('xpath:.//ul[contains(@class, "tag-list")]')
         if tag_list:
-            tags = [tag.text for tag in tag_list.eles('tag:li')]  # 提取所有li元素的文本
+            tags = [self.clean_text(tag.text) for tag in tag_list.eles('tag:li')]
+            job['全部标签'] = tags
             if len(tags) > 0:
                 job['经验要求'] = tags[0]
             if len(tags) > 1:
@@ -560,6 +578,8 @@ class JobParser:
             '职位状态': '',
             '职位标题': '',
             '薪资': '',
+            'tag-icon': '',
+            '全部标签': [],
             '工作城市': '',
             '工作区域': '',
             '工作地点': '',
@@ -584,6 +604,8 @@ class JobParser:
             list_data = self.job_list_cache[job_id]
             job['职位标题'] = list_data.get('职位名称', '')
             job['薪资'] = list_data.get('薪资', '')
+            job['tag-icon'] = list_data.get('tag-icon', '')
+            job['全部标签'] = list_data.get('全部标签', [])
             job['工作区域'] = list_data.get('工作地点', '').split('·')[1] if '·' in list_data.get('工作地点', '') else ''
             job['工作地点'] = list_data.get('工作地点', '') if '·' in list_data.get('工作地点', '') else ''
             job['公司名称'] = list_data.get('公司', '')
