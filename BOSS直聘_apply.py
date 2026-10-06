@@ -661,22 +661,22 @@ class JobParser:
 
             # 岗位标签
             welfare = []
-            job_tags = page.ele('xpath://div[contains(@class, "job-tags")]', timeout=1)
+            job_tags = page.ele('xpath://div[contains(@class, "job-tags")]', timeout=0)
             if job_tags:
-                for span in job_tags.eles('xpath:.//span', timeout=1):
+                for span in job_tags.eles('xpath:.//span', timeout=0):
                     if span.text.strip():
                         welfare.append(self.clean_text(span.text))
             job['岗位标签'] = '、'.join(welfare)
 
             # 招聘负责人信息（姓名、活跃状态、招聘者职位）
-            boss = page.ele('xpath://div[@class="job-boss-info"]', timeout=5)
+            boss = page.ele('xpath://div[@class="job-boss-info"]', timeout=0)
             if boss:
                 # 获取姓名元素
-                name_elem = boss.ele('xpath:.//h2[@class="name"]')
+                name_elem = boss.ele('xpath:.//h2[@class="name"]', timeout=0)
                 if name_elem:
                     full_text = name_elem.text.strip()
                     # 获取状态元素（可能是boss-active-time或boss-online-tag）
-                    status_elem = boss.ele('xpath:.//span[contains(@class, "boss-active-time") or contains(@class, "boss-online-tag")]', timeout=1)
+                    status_elem = boss.ele('xpath:.//span[contains(@class, "boss-active-time") or contains(@class, "boss-online-tag")]', timeout=0)
                     status = status_elem.text.strip() if status_elem else ''
                     # 如果状态在姓名里，从姓名中移除
                     name = full_text.replace(status, '').strip() if status and status in full_text else full_text
@@ -696,7 +696,7 @@ class JobParser:
     def _get_text(self, element, selector: str) -> str:
         """安全获取元素文本"""
         try:
-            elem = element.ele(selector, timeout=1)
+            elem = element.ele(selector, timeout=0)
             return self.clean_text(elem.text) if elem else ''
         except:
             return ''
