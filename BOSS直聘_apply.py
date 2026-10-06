@@ -711,12 +711,12 @@ class JobParser:
             boss = page.ele('xpath://div[@class="job-boss-info"]', timeout=0)
             if boss:
                 # 获取姓名元素
-                name_elem = boss.ele('xpath:.//h2[@class="name"]', timeout=0)
+                name_elem = self._get_text(boss, 'xpath:.//h2[@class="name"]')
                 if name_elem:
-                    full_text = name_elem.text.strip()
+                    full_text = name_elem.strip()
                     # 获取状态元素（可能是boss-active-time或boss-online-tag）
-                    status_elem = boss.ele('xpath:.//span[contains(@class, "boss-active-time") or contains(@class, "boss-online-tag")]', timeout=0)
-                    status = status_elem.text.strip() if status_elem else ''
+                    status_elem = self._get_text(boss, 'xpath:.//span[contains(@class, "boss-active-time") or contains(@class, "boss-online-tag")]')
+                    status = status_elem.strip() if status_elem else ''
                     # 如果状态在姓名里，从姓名中移除
                     name = full_text.replace(status, '').strip() if status and status in full_text else full_text
 
@@ -736,7 +736,19 @@ class JobParser:
         """安全获取元素文本"""
         try:
             elem = element.ele(selector, timeout=0)
-            return self.clean_text(elem.text) if elem else ''
+            if not elem:
+                return ''
+
+            kanzhun_found = False
+            for span in elem.eles('tag:span', timeout=0):
+                if span.text.strip() == 'kanzhun':
+                    span.run_js('this.remove()')
+                    kanzhun_found = True
+
+            cleaned_text = self.clean_text(elem.text)
+            if kanzhun_found:
+                logger.debug(f'清洗：kanzhun in {cleaned_text[:10]}')
+            return cleaned_text
         except:
             return ''
 
