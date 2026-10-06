@@ -522,7 +522,7 @@ class JobParser:
         }
 
         # 职位名称和链接
-        name_elem = card.ele('xpath:.//a[contains(@class, "job-name")]')
+        name_elem = card.ele('xpath:.//a[contains(@class, "job-name")]', timeout=0)
         if name_elem:
             job['职位名称'] = self.clean_text(name_elem.text)
             href = name_elem.attr('href')
@@ -530,26 +530,26 @@ class JobParser:
                 job['职位详情链接'] = 'https://www.zhipin.com' + href if not href.startswith('http') else href
 
         # 薪资中的数字使用私有区字符编码，需要先还原为普通数字。
-        salary_elem = card.ele('xpath:.//span[contains(@class, "job-salary")]')
+        salary_elem = card.ele('xpath:.//span[contains(@class, "job-salary")]', timeout=0)
         if salary_elem:
             job['薪资'] = self.decode_salary(salary_elem.text)
 
-        tag_icon_elem = card.ele('xpath:.//img[contains(@class, "job-tag-icon")]')
+        tag_icon_elem = card.ele('css:img.job-tag-icon', timeout=0)
         if tag_icon_elem:
             job['tag-icon'] = self.clean_text(tag_icon_elem.attr('alt') or '')
 
         # 公司
-        company_elem = card.ele('xpath:.//span[contains(@class, "boss-name")]')
+        company_elem = card.ele('xpath:.//span[contains(@class, "boss-name")]', timeout=0)
         if company_elem:
             job['公司'] = self.clean_text(company_elem.text)
 
         # 地点
-        loc_elem = card.ele('xpath:.//span[contains(@class, "company-location")]')
+        loc_elem = card.ele('xpath:.//span[contains(@class, "company-location")]', timeout=0)
         if loc_elem:
             job['工作地点'] = self.clean_text(loc_elem.text)
 
         # 经验学历标签
-        tag_list = card.ele('xpath:.//ul[contains(@class, "tag-list")]')
+        tag_list = card.ele('xpath:.//ul[contains(@class, "tag-list")]', timeout=0)
         if tag_list:
             tags = [self.clean_text(tag.text) for tag in tag_list.eles('tag:li')]
             job['全部标签'] = tags
@@ -559,7 +559,7 @@ class JobParser:
                 job['学历要求'] = tags[1]
 
         # 公司链接
-        company_link_elem = card.ele('xpath:.//a[contains(@class, "boss-info")]')
+        company_link_elem = card.ele('xpath:.//a[contains(@class, "boss-info")]', timeout=0)
         if company_link_elem:
             href = company_link_elem.attr('href')
             if href:
