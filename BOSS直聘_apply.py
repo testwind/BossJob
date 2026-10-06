@@ -545,7 +545,7 @@ class JobParser:
         if company_link_elem:
             href = company_link_elem.attr('href')
             if href:
-                job['公司详情链接'] = 'https://www.zhipin.com' + href
+                job['公司详情链接'] = 'https://www.zhipin.com' + href if not href.startswith('http') else href
 
         return job if job['职位名称'] else None
 
@@ -789,7 +789,7 @@ class JobScraper:
             tab.click()
             time.sleep(3) # 等待页面刷新
             
-            self._scroll_load_for_tab(self.config.max_jobs_per_type)
+            self._scroll_load_for_tab()
             
             jobs = self.parser.parse_job_list(self.page)
             if jobs:
