@@ -489,9 +489,18 @@ class SQLiteManager:
                 statistics['records'] += len(records)
                 for key in ('inserted', 'updated', 'failed'):
                     statistics[key] += result[key]
+                logger.info(
+                    f"SQLite导入文件: {os.path.basename(file_path)} | "
+                    f"总记录数: {len(records)} | 新插入数量: {result['inserted']} | "
+                    f"更新记录数量: {result['updated']} | 失败数量: {result['failed']}"
+                )
             except Exception as error:
                 statistics['failed'] += 1
-                logger.warning(f'导入JSON失败 {file_path}: {error}')
+                logger.warning(
+                    f"SQLite导入文件: {os.path.basename(file_path)} | "
+                    f"总记录数: 0 | 新插入数量: 0 | 更新记录数量: 0 | 失败数量: 1 | "
+                    f"错误: {error}"
+                )
         return statistics
 
     def close(self):
