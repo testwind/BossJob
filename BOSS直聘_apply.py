@@ -267,13 +267,13 @@ class FileManager:
             logger.error(f"加载JSON文件失败 {filename}: {e}")
             return []
 
-    def save_html(self, html_content: str, step_name: str, job_id: str = None):
+    def save_html(self, html_content: str, step_name: str, job_id: str = None, timestamp: str = None):
         """保存HTML源码到调试目录"""
         if not self.config.save_html_debug:
             return None
 
         try:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            timestamp = timestamp or datetime.now().strftime('%Y%m%d_%H%M%S')
 
             if job_id:
                 # 详情页HTML
@@ -838,7 +838,7 @@ class JobScraper:
         self.current_job_details: List[Dict] = []  # 当前已采集的详情数据
         self.html_save_count = 0  # 已保存的详情页HTML数量
 
-    def save_page_html(self, step_name: str, job_id: str = None):
+    def save_page_html(self, step_name: str, job_id: str = None, timestamp: str = None):
         """保存当前页面HTML源码"""
         if not self.config.save_html_debug:
             return
@@ -847,7 +847,7 @@ class JobScraper:
         if job_id and self.html_save_count >= self.config.max_html_save:
             return
 
-        filename = self.file_manager.save_html(self.page.html, step_name, job_id)
+        filename = self.file_manager.save_html(self.page.html, step_name, job_id, timestamp)
         if filename and job_id:
             self.html_save_count += 1
 
@@ -1081,7 +1081,7 @@ class JobScraper:
 
                 # 保存详情页HTML（前几个用于调试）
                 if job_id:
-                    self.save_page_html("04_职位详情", job_id)
+                    self.save_page_html("04_职位详情", job_id, timestamp)
 
                 job_data = self.parser.parse_job_detail(self.page, current_idx, link)
                 self.current_job_details.append(job_data)
