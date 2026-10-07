@@ -14,7 +14,7 @@ Desc   : Boss直聘数据采集工具 - DrissionPage自动化实现
          【运行模式】
          1. 完整模式 - 重新搜索职位并采集详情（自动去重）
          2. 续传模式 - 按最新时间戳批次继续采集
-         3. 进度转Excel - 导出最新时间戳批次的进度
+         3. 进度转JSON和Excel - 导出最新时间戳批次的进度
 
          【配置参数】
          - 职位名称、城市、滚动次数、延迟时间、Cookie管理等均在Config类中可调
@@ -27,18 +27,18 @@ Desc   : Boss直聘数据采集工具 - DrissionPage自动化实现
                ├─ {职位}_list_{时间戳}.json                    # 职位列表
                ├─ BOSS直聘_{城市}_{职位}_{时间戳}.json          # 详情数据JSON
                ├─ BOSS直聘_{城市}_{职位}_{时间戳}.xlsx          # 详情数据Excel
-               ├─ BOSS直聘_{城市}_{职位}_合并进度_{时间戳}.xlsx # 最新进度导出Excel
                ├─ html_debug/                                   # HTML源码调试目录
                │  ├─ 01_首页_{时间戳}.html
                │  ├─ 02_搜索结果页_{时间戳}.html
                │  ├─ 03_滚动加载后_{时间戳}.html
                │  └─ 04_职位详情_{职位ID}_{时间戳}.html
                └─ 留存/
-                ├─ {职位}_{时间戳}_progress_batch_001.json    # 批次进度
-                └─ {职位}_{时间戳}_progress_batch_final.json  # 最终进度
+             ├─ {职位}_{时间戳}_progress_batch_001.json    # 第1批新增数据
+             └─ {职位}_{时间戳}_progress_batch_002.json    # 第2批新增数据
 
            说明：同一个职位标签的一次采集使用同一个时间戳，贯穿列表、详情和进度文件。
-           续传模式自动选择最新的完整时间戳批次；进度转Excel只导出最新时间戳批次。
+         每个进度文件只保存当前批次新增成功的数据，不保存final文件。
+         所有批次尝试完成后，合并生成详情JSON和Excel；失败或跳过的职位不阻塞完成判断。
 """
 
 import json
@@ -217,6 +217,20 @@ class FileManager:
             files = [file_path for file_path in files if f'_{timestamp}_progress_batch_' in os.path.basename(file_path)]
         return files
 
+    def get_progress_batch_number(self, file_path: str) -> Optional[int]:
+        """从增量进度文件名中获取批次号。"""
+        match = re.search(r'_progress_batch_(\d+)\.json$', os.path.basename(file_path))
+        return int(match.group(1)) if match else None
+
+    def get_progress_batch_files(self, timestamp: str) -> Dict[int, str]:
+        """获取指定时间戳的增量进度文件，按批次号索引。"""
+        batch_files = {}
+        for file_path in self.get_progress_files(timestamp):
+            batch_number = self.get_progress_batch_number(file_path)
+            if batch_number is not None:
+                batch_files[batch_number] = file_path
+        return batch_files
+
     def find_latest_progress(self, timestamp: str = None) -> Optional[str]:
         """查找最新的进度文件"""
         progress_files = self.get_progress_files(timestamp)
@@ -236,40 +250,8 @@ class FileManager:
             list_name = os.path.basename(list_file)
             timestamp = list_name.rsplit('_list_', 1)[-1].removesuffix('.json')
             progress_file = self.find_latest_progress(timestamp)
-            if progress_file:
-                return list_file, progress_file, timestamp
+            return list_file, progress_file, timestamp
         return None, None, None
-
-    def cleanup_old_progress_files(self, timestamp: str, keep_final: bool = True):
-        """清理旧的进度文件，只保留final文件"""
-        try:
-            progress_files = self.get_progress_files(timestamp)
-
-            if not progress_files:
-                return
-
-            final_files = [f for f in progress_files if 'batch_final' in f]
-            batch_files = [f for f in progress_files if 'batch_' in f and 'final' not in f]
-
-            # 删除所有批次文件
-            for file_path in batch_files:
-                try:
-                    os.remove(file_path)
-                    logger.info(f"已删除旧进度文件: {os.path.basename(file_path)}")
-                except Exception as e:
-                    logger.warning(f"删除文件失败 {file_path}: {e}")
-
-            if not keep_final:
-                for file_path in final_files:
-                    try:
-                        os.remove(file_path)
-                        logger.info(f"已删除final进度文件: {os.path.basename(file_path)}")
-                    except Exception as e:
-                        logger.warning(f"删除文件失败 {file_path}: {e}")
-
-            logger.info(f"进度文件清理完成，保留 {len(final_files) if keep_final else 0} 个final文件")
-        except Exception as e:
-            logger.error(f"清理进度文件时出错: {e}")
 
     def save_json(self, data: List[Dict], filename: str):
         """保存JSON文件"""
@@ -989,6 +971,41 @@ class JobScraper:
         logger.info(f"从文件加载了 {len(self.job_links)} 个职位链接")
         return True
 
+    def merge_progress_files(self, timestamp: str) -> List[Dict]:
+        """合并指定时间戳下的增量进度文件。"""
+        merged_data = {}
+        batch_files = self.file_manager.get_progress_batch_files(timestamp)
+        for batch_number in sorted(batch_files):
+            progress_data = self.file_manager.load_json(batch_files[batch_number])
+            for item in progress_data:
+                sequence = item.get('序号')
+                if sequence:
+                    merged_data[sequence] = item
+        return [merged_data[sequence] for sequence in sorted(merged_data)]
+
+    def expected_progress_batch_count(self) -> int:
+        """根据职位列表数量计算应有的进度批次数。"""
+        if not self.job_links:
+            return 0
+        return (len(self.job_links) + self.config.detail_save_interval - 1) // self.config.detail_save_interval
+
+    def is_progress_complete(self, timestamp: str) -> bool:
+        """检查所有职位批次是否均已尝试完成。"""
+        batch_files = self.file_manager.get_progress_batch_files(timestamp)
+        expected_count = self.expected_progress_batch_count()
+        return expected_count > 0 and all(
+            batch_number in batch_files for batch_number in range(1, expected_count + 1)
+        )
+
+    def progress_processed_indices(self, timestamp: str) -> Set[int]:
+        """根据已保存的批次范围获取已经尝试过的职位序号。"""
+        processed_indices = set()
+        for batch_number in self.file_manager.get_progress_batch_files(timestamp):
+            start = (batch_number - 1) * self.config.detail_save_interval + 1
+            end = min(batch_number * self.config.detail_save_interval, len(self.job_links))
+            processed_indices.update(range(start, end + 1))
+        return processed_indices
+
     def scrape_details(self, timestamp: str) -> List[Dict]:
         """第二步：采集职位详情"""
         if not self.job_links:
@@ -1011,6 +1028,7 @@ class JobScraper:
         """继续采集未完成的职位"""
         success_count = len(self.current_job_details)
         fail_count = 0
+        batch_records = []
 
         for i, link in enumerate(self.job_links, 1):
             current_idx = i
@@ -1038,6 +1056,7 @@ class JobScraper:
 
                 job_data = self.parser.parse_job_detail(self.page, current_idx, link)
                 self.current_job_details.append(job_data)
+                batch_records.append(job_data)
                 success_count += 1
                 logger.info(f"成功: {job_data.get('职位标题')} | {job_data.get('薪资')} | {job_data.get('经验要求')} | "
                             f"{job_data.get('学历要求')} | {job_data.get('招聘负责人')} | {job_data.get('活跃状态')}")
@@ -1049,21 +1068,25 @@ class JobScraper:
             # 按间隔保存进度
             if current_idx % self.config.detail_save_interval == 0:
                 batch = current_idx // self.config.detail_save_interval
-                self._save_progress(batch, timestamp)
+                if batch not in self.file_manager.get_progress_batch_files(timestamp):
+                    self._save_progress(batch, timestamp, batch_records)
+                batch_records = []
 
-        # 最终保存 - 保存final并清理旧文件
-        if self.current_job_details:
-            self._save_progress('final', timestamp)
+        # 保存最后一个不足整批的批次；空数组也表示该批次已经尝试完成。
+        if len(self.job_links) % self.config.detail_save_interval:
+            batch = (len(self.job_links) // self.config.detail_save_interval) + 1
+            if batch not in self.file_manager.get_progress_batch_files(timestamp):
+                self._save_progress(batch, timestamp, batch_records)
 
         logger.info(f"详情采集完成: 成功{success_count} 失败{fail_count}")
         return self.current_job_details
 
-    def _save_progress(self, batch_num, timestamp: str):
+    def _save_progress(self, batch_num, timestamp: str, records: List[Dict]):
         """保存进度到留存目录"""
         try:
             # 按字段顺序整理
             ordered = []
-            for item in self.current_job_details:
+            for item in records:
                 ordered_item = {}
                 for field in JobParser.FIELD_ORDER:
                     ordered_item[field] = item.get(field, '')
@@ -1077,17 +1100,15 @@ class JobScraper:
             self.file_manager.save_json(ordered, filename)
             logger.info(f"进度已保存: {filename}")
 
-            if batch_str == 'final':
-                self.file_manager.cleanup_old_progress_files(timestamp, keep_final=True)
-
         except Exception as e:
             logger.error(f"保存进度失败: {e}")
 
     def save_results(self, timestamp: str):
         """保存最终结果：BOSS直聘_{城市}_{职位}_{时间戳}.json 和 .xlsx"""
+        # 最终导出始终以指定时间戳的全部增量进度文件为准。
+        self.current_job_details = self.merge_progress_files(timestamp)
         if not self.current_job_details:
-            logger.warning("没有数据可保存")
-            return None, None
+            logger.warning("没有成功采集的数据，将保存空的合并结果")
 
         # 按字段顺序整理
         ordered = []
@@ -1139,7 +1160,7 @@ def print_menu():
     print("请选择运行模式：")
     print("1. 完整模式：重新搜索并采集（自动去重）")
     print("2. 续传模式：直接从上次中断处继续（自动检测进度）")
-    print("3. 进度转Excel：导出最新时间戳批次")
+    print("3. 进度转JSON和Excel：导出最新时间戳批次")
     print("0. 退出程序")
     print(f"{'=' * 50}")
 
@@ -1209,8 +1230,8 @@ def main():
             elif mode == "2":
                 # 使用同一时间戳配对列表文件和进度文件
                 latest_list, latest_progress, timestamp = scraper.file_manager.find_latest_complete_batch()
-                if not latest_list or not latest_progress:
-                    logger.error("未找到完整时间戳批次，无法续传，请先运行完整模式生成列表和进度文件")
+                if not latest_list or not timestamp:
+                    logger.error("未找到时间戳列表批次，无法续传，请先运行完整模式生成职位列表")
                     continue
 
                 # 加载职位列表文件
@@ -1222,99 +1243,48 @@ def main():
                 if scraper.job_list:
                     scraper.parser.set_job_list_cache(scraper.job_list)
                 # 有进度文件，尝试续传
-                logger.info(f"检测到时间戳批次 [{timestamp}]，进度文件: {latest_progress}")
+                logger.info(f"检测到时间戳批次 [{timestamp}]，进度文件: {latest_progress or '暂无，开始新采集'}")
+                progress_data = scraper.merge_progress_files(timestamp)
+                processed_indices = scraper.progress_processed_indices(timestamp)
+                scraper.current_job_details = progress_data
 
-                # 加载进度文件中的数据
-                progress_data = scraper.file_manager.load_json(latest_progress)
-                if not progress_data:
-                    logger.warning("进度文件为空，开始从头采集职位详情")
-                    scraper.current_job_details = []
-                    processed_indices = set()
-                else:
-                    # 获取已采集的序号
-                    processed_indices = {item.get('序号', 0) for item in progress_data if item.get('序号')}
-                    max_done = max(processed_indices) if processed_indices else 0
+                if scraper.is_progress_complete(timestamp):
+                    logger.info("所有职位批次均已尝试完成，重新整理结果文件")
+                    scraper.save_results(timestamp)
+                    return
 
-                    if max_done >= len(scraper.job_links):
-                        logger.info("所有职位已采集完成，重新整理结果文件")
-                        scraper.current_job_details = progress_data
-                        scraper.save_results(timestamp)
-                        return
-
-                    # 设置已有数据
-                    scraper.current_job_details = progress_data
-                    logger.info(
-                        f"从进度恢复: 已采集 {len(scraper.current_job_details)} 个，将继续采集第 {max_done + 1} 到 {len(scraper.job_links)} 个职位")
+                logger.info(
+                    f"从进度恢复: 已保存 {len(progress_data)} 个成功职位，将继续采集未完成批次")
 
                 # 开始采集
-                details = scraper._continue_scraping(processed_indices, timestamp)
-                if details:
+                scraper._continue_scraping(processed_indices, timestamp)
+                if scraper.is_progress_complete(timestamp):
                     scraper.save_results(timestamp)
                 else:
-                    logger.warning("未采集到任何职位详情数据，请检查：")
-                    logger.warning("1. 网络连接是否稳定")
-                    logger.warning("2. 账号是否登录成功，未登录则需修改参数 cookie_refresh 为True，扫码重新登录账号")
+                    logger.warning("进度批次尚未全部完成，请稍后继续运行续传模式")
                 return
 
             elif mode == "3":
-                logger.info("=== 导出最新时间戳批次进度为Excel ===")
-                _, _, timestamp = scraper.file_manager.find_latest_complete_batch()
-                progress_files = scraper.file_manager.get_progress_files(timestamp) if timestamp else []
+                logger.info("=== 合并最新时间戳批次进度为JSON和Excel ===")
+                latest_list, _, timestamp = scraper.file_manager.find_latest_complete_batch()
 
-                if not timestamp or not progress_files:
-                    logger.error("未找到完整时间戳批次进度文件，请先运行完整模式或续传模式生成进度数据")
+                if not latest_list or not timestamp:
+                    logger.error("未找到时间戳列表批次，请先运行完整模式生成职位列表")
                     continue
-                logger.info(f"找到时间戳 [{timestamp}] 的 {len(progress_files)} 个进度文件")
-
-                # 按文件名排序（确保按批次顺序）
-                progress_files.sort()
-
-                # 用于去重的字典（按序号去重）
-                merged_data = {}
-                duplicate_count = 0
-
-                # 遍历所有进度文件，合并数据
-                for i, file_path in enumerate(progress_files, 1):
-                    filename = os.path.basename(file_path)
-                    logger.info(f"正在处理 [{i}/{len(progress_files)}]: {filename}")
-
-                    # 加载进度数据
-                    progress_data = scraper.file_manager.load_json(file_path)
-                    if not progress_data:
-                        logger.warning(f"  文件 {filename} 为空，跳过")
-                        continue
-                    logger.info(f"  加载了 {len(progress_data)} 条数据")
-
-                    # 合并数据（按序号去重，后面的批次会覆盖前面的）
-                    for item in progress_data:
-                        seq = item.get('序号')
-                        if seq:
-                            if seq in merged_data:
-                                duplicate_count += 1
-                            merged_data[seq] = item
-
-                if not merged_data:
-                    logger.error("合并后没有有效数据")
+                if not scraper.load_job_list_from_file(latest_list):
+                    logger.error("加载时间戳列表失败，无法导出结果")
                     continue
-
-                # 按序号排序
-                sorted_data = [merged_data[seq] for seq in sorted(merged_data.keys())]
-                # 按字段顺序整理
-                ordered = []
-                for item in sorted_data:
-                    ordered_item = {}
-                    for field in JobParser.FIELD_ORDER:
-                        ordered_item[field] = item.get(field, '')
-                    ordered.append(ordered_item)
-                # 使用进度批次的时间戳生成Excel文件名
-                excel_file = os.path.join(
-                    scraper.file_manager.data_dir,
-                    f"BOSS直聘_{config.city_name}_{config.job_name}_合并进度_{timestamp}.xlsx"
-                )
-                # 保存为Excel
-                df = pd.DataFrame(ordered)
-                df.to_excel(excel_file, index=False)
-                logger.info(f"✅ 所有进度数据已成功合并导出为Excel: {excel_file}")
+                if not scraper.is_progress_complete(timestamp):
+                    logger.error("最新时间戳批次尚未完成全部职位尝试，无法导出结果")
+                    continue
+                logger.info(f"正在合并时间戳 [{timestamp}] 的增量进度文件")
+                scraper.current_job_details = scraper.merge_progress_files(timestamp)
+                if not scraper.current_job_details:
+                    logger.warning("所有职位均采集失败，生成空结果文件")
+                if not scraper.current_job_details and scraper.expected_progress_batch_count() == 0:
+                    logger.error("职位列表为空，无法导出结果")
+                    continue
+                scraper.save_results(timestamp)
 
             else:
                 print("无效的选择，请重新输入")
