@@ -63,6 +63,7 @@ from DrissionPage import ChromiumPage
 class Config:
     """统一配置类"""
     platform: str = "快速求职"  # 平台名称，用于实际输出文件名
+    platform_url: str = "https://www.zhipin.com"    # 平台网址
     # 搜索配置
     job_name: str = "数据"  # 搜索的职位名称
     city_name: str = "上海"  # 搜索城市名称
@@ -517,8 +518,9 @@ class SQLiteManager:
 class CityCodeManager:
     """城市代码管理器 - 从{平台}API获取城市代码"""
 
-    def __init__(self):
+    def __init__(self, platform_url: str):
         self.cache = {}  # 缓存已获取的城市代码
+        self.platform_url = platform_url.rstrip('/')
 
     def get_city_code(self, city_name: str) -> Optional[str]:
         """根据城市名称获取城市代码"""
@@ -529,7 +531,7 @@ class CityCodeManager:
 
         try:
             logger.debug("正在从{平台}API获取城市 [{}] 的代码...".format(city_name))
-            response = requests.get("https://www.zhipin.com/wapi/zpCommon/data/city.json")
+            response = requests.get(f"{self.platform_url}/wapi/zpCommon/data/city.json")
 
             if response.status_code != 200:
                 logger.error(f"请求城市数据失败，状态码: {response.status_code}")
@@ -577,7 +579,7 @@ class PageOperator:
             return False
 
         logger.info("开始加载Cookie")
-        self.page.get("https://www.zhipin.com")
+        self.page.get(self.config.platform_url)
         time.sleep(2)
 
         cookies = self.file_manager.load_json(self.config.cookie_file)
@@ -778,7 +780,7 @@ class JobParser:
             job['职位名称'] = self.clean_text(name_elem.text)
             href = name_elem.attr('href')
             if href:
-                job['职位详情链接'] = 'https://www.zhipin.com' + href if not href.startswith('http') else href
+                job['职位详情链接'] = self.config.platform_url.rstrip('/') + href if not href.startswith('http') else href
 
         # 薪资中的数字使用私有区字符编码，需要先还原为普通数字。
         salary_elem = self._get_ele(card, 'xpath:.//span[contains(@class, "job-salary")]', timeout=0)
@@ -814,7 +816,7 @@ class JobParser:
         if company_link_elem:
             href = company_link_elem.attr('href')
             if href:
-                job['公司详情链接'] = 'https://www.zhipin.com' + href if not href.startswith('http') and not href.startswith('javascript') else href
+                job['公司详情链接'] = self.config.platform_url.rstrip('/') + href if not href.startswith('http') and not href.startswith('javascript') else href
 
         return job if job['职位名称'] else None
 
@@ -1080,7 +1082,7 @@ class JobScraper:
         try:
             # 访问职位页
             logger.info("正在访问{平台}职位页...")
-            self.page.get("https://www.zhipin.com/web/geek/jobs")
+            self.page.get(f"{self.config.platform_url.rstrip('/')}/web/geek/jobs")
             # 等待搜索框出现（匹配class或placeholder符合的input元素）
             self.page.wait.ele_displayed('xpath://div[@class="expect-list has-add no-part"]', timeout=10)
 
@@ -1435,7 +1437,7 @@ def main():
     # 获取城市代码
     if config.city_name and not config.city_code:
         logger.info(f"正在获取城市 [{config.city_name}] 的代码...")
-        city_manager = CityCodeManager()
+        city_manager = CityCodeManager(config.platform_url)
         code = city_manager.get_city_code(config.city_name)
         if code:
             config.city_code = code
@@ -1457,7 +1459,7 @@ def main():
         # 是否重新登录{平台}刷新Cookie
         config.cookie_refresh = True
         if config.cookie_refresh:
-            scraper.page_operator.get_cookie(url='https://www.zhipin.com', timeout=config.cookie_wait)
+            scraper.page_operator.get_cookie(url=config.platform_url, timeout=config.cookie_wait)
 
         # 加载Cookie
         if not scraper.page_operator.load_cookie():
