@@ -126,6 +126,7 @@ class LogManager:
 
             # 控制台输出
             console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.DEBUG)
             console_handler.setFormatter(formatter)
             logger.addHandler(console_handler)
 
@@ -139,6 +140,7 @@ class LogManager:
                 backupCount=7,
                 encoding="utf-8",
             )
+            file_handler.setLevel(logging.DEBUG)
             file_handler.setFormatter(formatter)
             file_handler.suffix = "%Y%m%d.txt"
             logger.addHandler(file_handler)
@@ -530,7 +532,11 @@ class CityCodeManager:
             return self.cache[city_name]
 
         try:
-            logger.debug("正在从{平台}API获取城市 [{}] 的代码...".format(city_name))
+            logger.debug(
+                "正在从 %s 获取城市 [%s] 的代码...",
+                self.platform_url,
+                city_name,
+            )
             response = requests.get(f"{self.platform_url}/wapi/zpCommon/data/city.json")
 
             if response.status_code != 200:
