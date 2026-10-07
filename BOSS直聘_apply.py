@@ -74,7 +74,7 @@ class Config:
 
     # Cookie配置
     cookie_refresh: bool = False  # 是否重新登录BOSS直聘刷新Cookie信息（点开登录界面，扫码登录后就可以不用管了）
-    cookie_wait: int = 30  # 登录BOSS直聘页面等待时间
+    cookie_wait: int = 5  # 登录BOSS直聘页面等待时间
     cookie_file: str = 'cookies.json'  # Cookie文件
 
     # 目录配置
@@ -366,11 +366,32 @@ class PageOperator:
 
         return True
 
-    def get_cookie(self, url: str, timeout=30):
+    def has_login_button(self) -> bool:
+        """检查当前页面是否仍显示登录页面或登录按钮"""
+        try:
+            title = self.page.title or ''
+            if '登录' in title:
+                return True
+
+            return bool(self.page.ele('css:a[ka="header-login"]', timeout=0))
+        except Exception:
+            return False
+
+    def get_cookie(self, url: str, timeout=5):
         """获取Cookie（手动登录）"""
         logger.info("请打开登录窗口，扫码登录您的个人账号...")
         self.page.get(url)
-        time.sleep(timeout)  # 等待手动登录
+
+        should_login = True
+
+        while should_login:
+            logger.info("仍检测到登录按钮，等待登录完成...")
+            time.sleep(3)
+            should_login = self.has_login_button()
+            if not should_login:
+                logger.info("检测到没有登录按钮，等待登无变化... %d 秒",timeout)
+                time.sleep(timeout)  # 等待确认登录无变化
+                should_login = self.has_login_button()
 
         cookies = self.page.cookies()
         self.file_manager.save_json(cookies, self.config.cookie_file)
