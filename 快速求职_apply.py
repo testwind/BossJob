@@ -998,6 +998,7 @@ class JobParser:
 
             kanzhun_found = False
             kanzhun_found_str = ""
+            elem_text = elem.text[:30]
             for span in elem.eles('tag:span', timeout=timeout):
                 span_text = span.text.lower().strip()
                 if span_text == 'kanzhun' or span_text == '来自boss直聘' or span_text == 'boss直聘' or span_text == '直聘' or span_text == 'boss':
@@ -1005,7 +1006,7 @@ class JobParser:
                     kanzhun_found = True
                     kanzhun_found_str += span_text + " "
             if kanzhun_found:
-                logger.debug(f'清洗：' + kanzhun_found_str + " in " + elem.text[:20])
+                logger.debug(f'清洗：' + kanzhun_found_str + " in " + elem_text)
             return elem
         except:
             return None
