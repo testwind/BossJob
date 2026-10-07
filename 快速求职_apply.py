@@ -1005,7 +1005,7 @@ class JobParser:
                     kanzhun_found = True
                     kanzhun_found_str += span_text + " "
             if kanzhun_found:
-                logger.debug(f'清洗：' + kanzhun_found_str)
+                logger.debug(f'清洗：' + kanzhun_found_str + " in " + elem.text[:20])
             return elem
         except:
             return None
