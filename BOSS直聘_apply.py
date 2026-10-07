@@ -523,7 +523,7 @@ class JobParser:
         }
 
         # 职位名称和链接
-        name_elem = card.ele('xpath:.//a[contains(@class, "job-name")]', timeout=0)
+        name_elem = self._get_ele(card, 'xpath:.//a[contains(@class, "job-name")]', timeout=0)
         if name_elem:
             job['职位名称'] = self.clean_text(name_elem.text)
             href = name_elem.attr('href')
@@ -531,26 +531,26 @@ class JobParser:
                 job['职位详情链接'] = 'https://www.zhipin.com' + href if not href.startswith('http') else href
 
         # 薪资中的数字使用私有区字符编码，需要先还原为普通数字。
-        salary_elem = card.ele('xpath:.//span[contains(@class, "job-salary")]', timeout=0)
+        salary_elem = self._get_ele(card, 'xpath:.//span[contains(@class, "job-salary")]', timeout=0)
         if salary_elem:
             job['薪资'] = self.decode_salary(salary_elem.text)
 
-        tag_icon_elem = card.ele('css:img.job-tag-icon', timeout=0)
+        tag_icon_elem = self._get_ele(card, 'css:img.job-tag-icon', timeout=0)
         if tag_icon_elem:
             job['tag-icon'] = self.clean_text(tag_icon_elem.attr('alt') or '')
 
         # 公司
-        company_elem = card.ele('xpath:.//span[contains(@class, "boss-name")]', timeout=0)
+        company_elem = self._get_ele(card, 'xpath:.//span[contains(@class, "boss-name")]', timeout=0)
         if company_elem:
             job['公司'] = self.clean_text(company_elem.text)
 
         # 地点
-        loc_elem = card.ele('xpath:.//span[contains(@class, "company-location")]', timeout=0)
+        loc_elem = self._get_ele(card, 'xpath:.//span[contains(@class, "company-location")]', timeout=0)
         if loc_elem:
             job['工作地点'] = self.clean_text(loc_elem.text)
 
         # 经验学历标签
-        tag_list = card.ele('xpath:.//ul[contains(@class, "tag-list")]', timeout=0)
+        tag_list = self._get_ele(card, 'xpath:.//ul[contains(@class, "tag-list")]', timeout=0)
         if tag_list:
             tags = [self.clean_text(tag.text) for tag in tag_list.eles('tag:li')]
             job['全部标签'] = tags
@@ -560,7 +560,7 @@ class JobParser:
                 job['学历要求'] = tags[1]
 
         # 公司链接
-        company_link_elem = card.ele('xpath:.//a[contains(@class, "boss-info")]', timeout=0)
+        company_link_elem = self._get_ele(card, 'xpath:.//a[contains(@class, "boss-info")]', timeout=0)
         if company_link_elem:
             href = company_link_elem.attr('href')
             if href:
@@ -578,6 +578,7 @@ class JobParser:
             '数据采集时间': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             '职位状态': '',
             '职位标题': '',
+            '薪资-0': '',
             '薪资': '',
             'tag-icon': '',
             '全部标签': [],
@@ -611,7 +612,7 @@ class JobParser:
         if job_id and job_id in self.job_list_cache:
             list_data = self.job_list_cache[job_id]
             job['职位标题'] = list_data.get('职位名称', '')
-            job['薪资'] = list_data.get('薪资', '')
+            job['薪资-0'] = list_data.get('薪资', '')
             job['tag-icon'] = list_data.get('tag-icon', '')
             job['全部标签'] = list_data.get('全部标签', [])
             job['工作区域'] = list_data.get('工作地点', '').split('·')[1] if '·' in list_data.get('工作地点', '') else ''
@@ -637,29 +638,29 @@ class JobParser:
                 if info_text:
                     job['工作城市'] = self._get_text(info_text, 'xpath:.//a[contains(@class, "text-city")]')
 
-                    exp = info_text.ele('xpath:.//span[contains(@class, "text-experiece")]')
+                    exp = self._get_ele(info_text,'xpath:.//span[contains(@class, "text-experiece")]')
                     if exp:
                         job['经验要求'] = self.clean_text(exp.text)
 
-                    edu = info_text.ele('xpath:.//span[contains(@class, "text-degree")]')
+                    edu = self._get_ele(info_text,'xpath:.//span[contains(@class, "text-degree")]')
                     if edu:
                         job['学历要求'] = self.clean_text(edu.text)
 
             # 职位描述和标签
-            job_detail = page.ele('xpath://div[@class="job-detail-section"]', timeout=5)
+            job_detail = page.ele('xpath://div[@class="job-detail-section"]', timeout=0)
             if job_detail:
                 job['职位描述'] = self._get_text(job_detail, 'xpath:.//div[contains(@class, "job-sec-text")]')
                 # 技能标签
                 skills = []
-                keyword_list = job_detail.ele('xpath:.//ul[contains(@class, "job-keyword-list")]')
+                keyword_list = self._get_ele( job_detail, 'xpath:.//ul[contains(@class, "job-keyword-list")]', timeout=0)
                 if keyword_list:
-                    for item in keyword_list.eles('xpath:.//li', timeout=1):
+                    for item in keyword_list.eles('xpath:.//li', timeout=0):
                         skills.append(self.clean_text(item.text))
                 if skills:
                     job['岗位标签'] = '、'.join(skills)
 
             # 公司信息
-            company = page.ele('xpath://div[@class="sider-company"]', timeout=5)
+            company = page.ele('xpath://div[@class="sider-company"]', timeout=0)
             if company:
                 job['公司名称'] = self._get_text(company, 'xpath:.//a[@ka="job-detail-company_custompage"]')
                 job['所属行业'] = self._get_text(company, 'xpath:.//a[@ka="job-detail-brandindustry"]')
@@ -668,7 +669,7 @@ class JobParser:
                 job['公司规模'] = self._get_text(company, 'xpath:.//p[i[contains(@class, "icon-scale")]]')
 
             # 工商信息
-            business_info = page.ele(
+            business_info = self._get_ele(page,
                 'xpath://div[contains(@class, "business-info-box")]', timeout=0
             )
             business_fields = {
@@ -692,7 +693,7 @@ class JobParser:
                         job[field_name] = self.clean_text(value)
 
             # 工商信息下方的公司工作地址
-            address = page.ele(
+            address = self._get_ele(page,
                 'css:div.company-address div.location-address', timeout=0
             )
             if address:
@@ -700,7 +701,7 @@ class JobParser:
 
             # 岗位标签
             welfare = []
-            job_tags = page.ele('xpath://div[contains(@class, "job-tags")]', timeout=0)
+            job_tags = self._get_ele(page,'xpath://div[contains(@class, "job-tags")]', timeout=0)
             if job_tags:
                 for span in job_tags.eles('xpath:.//span', timeout=0):
                     if span.text.strip():
@@ -732,23 +733,56 @@ class JobParser:
 
         return job
 
-    def _get_text(self, element, selector: str) -> str:
+    def _get_ele(self, element, selector: str, timeout: float = 0):
         """安全获取元素文本"""
         try:
-            elem = element.ele(selector, timeout=0)
+            if not element:
+                return None
+            elem = element.ele(selector, timeout=timeout)
             if not elem:
-                return ''
+                return None
 
             kanzhun_found = False
-            for span in elem.eles('tag:span', timeout=0):
+            for span in elem.eles('tag:span', timeout=timeout):
                 if span.text.strip() == 'kanzhun':
                     span.run_js('this.remove()')
                     kanzhun_found = True
-
-            cleaned_text = self.clean_text(elem.text)
             if kanzhun_found:
-                logger.debug(f'清洗：kanzhun in {cleaned_text[:10]}')
-            return cleaned_text
+                logger.debug(f'清洗：kanzhun')
+            return elem
+        except:
+            return None
+
+
+    def _get_eles(self, element, selector: str, timeout: float = 0):
+        """安全获取元素数组"""
+        try:
+            if not element:
+                return []
+            elems = element.eles(selector, timeout=timeout)
+            if not elems:
+                return []
+
+            kanzhun_found = False
+            for elem in elems:
+                for span in elem.eles('tag:span', timeout=timeout):
+                    if span.text.strip() == 'kanzhun':
+                        span.run_js('this.remove()')
+                        kanzhun_found = True
+            if kanzhun_found:
+                logger.debug(f'清洗：kanzhun')
+            return elems
+        except:
+            return []
+
+    def _get_text(self, element, selector: str) -> str:
+        """安全获取元素文本"""
+        try:
+            elem = self._get_ele(element, selector)
+            if not elem:
+                return ''
+
+            return elem.text
         except:
             return ''
 
