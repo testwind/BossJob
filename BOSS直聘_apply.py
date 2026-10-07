@@ -404,7 +404,7 @@ class JobParser:
 
     # 字段顺序定义（用于统一输出格式）
     FIELD_ORDER = [
-        '序号', '数据采集时间', '职位状态', '职位标题', '薪资-0', '薪资', 'tag-icon', '全部标签', '工作城市', '工作区域', '工作地点',
+        '序号', '数据列表时间', '数据采集时间', '职位状态', '职位标题', '薪资-0', '薪资', 'tag-icon', '全部标签', '工作城市', '工作区域', '工作地点',
         '经验要求', '学历要求', '岗位标签', '职位描述', '职位详情链接', '职位唯一ID', '公司名称',
         '公司详情链接', '融资情况', '公司规模', '所属行业', '工商-公司名称', '工商-法定代表人', '工商-成立日期',
         '工商-企业类型', '工商-经营状态', '工商-注册资金', '工商-工作地址', '招聘负责人', '活跃状态', '招聘者职位'
@@ -531,7 +531,8 @@ class JobParser:
         job = {
             '序号': index,
             '职位名称': '',
-            '薪资': '',
+            '数据列表时间': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            '薪资-0': '',
             'tag-icon': '',
             '全部标签': [],
             '公司': '',
@@ -554,7 +555,7 @@ class JobParser:
         # 薪资中的数字使用私有区字符编码，需要先还原为普通数字。
         salary_elem = self._get_ele(card, 'xpath:.//span[contains(@class, "job-salary")]', timeout=0)
         if salary_elem:
-            job['薪资'] = self.decode_salary(salary_elem.text)
+            job['薪资-0'] = self.decode_salary(salary_elem.text)
 
         tag_icon_elem = self._get_ele(card, 'css:img.job-tag-icon', timeout=0)
         if tag_icon_elem:
@@ -596,6 +597,7 @@ class JobParser:
         # 初始化基础数据
         job = {
             '序号': index,
+            '数据列表时间': '',
             '数据采集时间': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             '职位状态': '',
             '职位标题': '',
@@ -633,7 +635,8 @@ class JobParser:
         if job_id and job_id in self.job_list_cache:
             list_data = self.job_list_cache[job_id]
             job['职位标题'] = list_data.get('职位名称', '')
-            job['薪资-0'] = list_data.get('薪资', '')
+            job['数据列表时间'] = list_data.get('数据列表时间', '')
+            job['薪资-0'] = list_data.get('薪资-0', '')
             job['tag-icon'] = list_data.get('tag-icon', '')
             job['全部标签'] = list_data.get('全部标签', [])
             job['工作区域'] = list_data.get('工作地点', '').split('·')[1] if '·' in list_data.get('工作地点', '') else ''
