@@ -440,9 +440,9 @@ class SQLiteManager:
             and (end_time is None or value <= end_time)
         )
 
-    def batch_import_json(self, job_name: str = None, start_time: str = None,
-                          end_time: str = None) -> Dict[str, int]:
-        """按职位和时间范围，按文件时间顺序导入最终JSON。"""
+    def batch_import_json(self, start_time: str = None, end_time: str = None,
+                          job_name: str = None) -> Dict[str, int]:
+        """按开始时间、结束时间和职位名称，按文件时间顺序导入最终JSON。"""
         start = self._parse_filter_time(start_time)
         end = self._parse_filter_time(end_time)
         if start and end and start > end:
@@ -1402,6 +1402,7 @@ def print_menu():
     print("1. 完整模式：重新搜索并采集（自动去重）")
     print("2. 续传模式：直接从上次中断处继续（自动检测进度）")
     print("3. 进度转JSON和Excel：导出最新时间戳批次")
+    print("4. 导入历史JSON到SQLite：4 [开始时间] [结束时间] [职位名称]（省略参数用0）")
     print("0. 退出程序")
     print(f"{'=' * 50}")
 
@@ -1526,6 +1527,29 @@ def main():
                     logger.error("职位列表为空，无法导出结果")
                     continue
                 scraper.save_results(timestamp)
+
+            elif mode.startswith("4 "):
+                # 参数顺序：开始时间、结束时间、职位名称；0表示省略参数。
+                parameters = mode[2:].split()
+                if len(parameters) > 3:
+                    print("4模式最多支持三个参数：开始时间 结束时间 职位名称")
+                    continue
+
+                parameters.extend(['0'] * (3 - len(parameters)))
+                start_time, end_time, job_name = (
+                    None if value == '0' else value
+                    for value in parameters
+                )
+                try:
+                    with SQLiteManager(config) as sqlite_manager:
+                        statistics = sqlite_manager.batch_import_json(
+                            start_time=start_time,
+                            end_time=end_time,
+                            job_name=job_name,
+                        )
+                    logger.info(f"SQLite历史JSON导入完成: {statistics}")
+                except Exception as error:
+                    logger.error(f"SQLite历史JSON导入失败: {error}", exc_info=True)
 
             else:
                 print("无效的选择，请重新输入")
