@@ -862,9 +862,6 @@ class JobScraper:
             # 等待搜索框出现（匹配class或placeholder符合的input元素）
             self.page.wait.ele_displayed('xpath://div[@class="expect-list has-add no-part"]', timeout=10)
 
-            # 保存首页HTML
-            self.save_page_html("01_职位首页")
-
         except Exception as e:
             logger.error(f"搜索职位失败: {e}")
             return []
@@ -955,6 +952,9 @@ class JobScraper:
             
             tab.click()
             time.sleep(3) # 等待页面刷新
+
+            # 当前职位标签已切换完成，此时保存到当前职位对应的目录。
+            self.save_page_html("01_职位首页")
             
             self._scroll_load_for_tab()
             
