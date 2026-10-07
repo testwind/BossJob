@@ -87,7 +87,7 @@ class Config:
     # 目录配置
     data_root_dir: str = 'output'  # 数据根目录
     progress_dir: str = '留存'  # 进度文件存放子目录
-    sqlite_file: str = 'bossjob.sqlite3'  # SQLite文件名，默认放在脚本同级目录
+    sqlite_file: str = 'quickjob.sqlite3'  # SQLite文件名，默认放在脚本同级目录
 
 
 # ==================== 工具类 ====================
