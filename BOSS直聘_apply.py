@@ -911,12 +911,41 @@ class JobScraper:
     def scrape_expected_jobs_mode(self):
         """【新模式1】遍历期待职位标签进行采集"""
         self.navigate_to_jobs_page()
-        tabs = self.get_expected_job_tabs()
-        logger.info(f"找到 {len(tabs)} 个期待职位标签")
+        initial_tabs = self.get_expected_job_tabs()
+        tab_names = []
+        for tab in initial_tabs:
+            try:
+                tab_name = tab.ele('xpath:.//span').text.strip()
+            except Exception as e:
+                logger.warning(f"读取职位标签名称失败，跳过该标签: {e}")
+                continue
+            if tab_name:
+                tab_names.append(tab_name)
 
-        for i, tab in enumerate(tabs):
-            tab_name = tab.ele('xpath:.//span').text
-            logger.info(f"正在采集标签: {tab_name} ({i+1}/{len(tabs)})")
+        logger.info(f"找到 {len(tab_names)} 个期待职位标签")
+
+        for i, tab_name in enumerate(tab_names):
+            # 详情采集期间页面会跳转，旧标签元素会失效；每轮重新获取当前页面元素。
+            if i > 0:
+                self.navigate_to_jobs_page()
+
+            tabs = self.get_expected_job_tabs()
+            tab = None
+            for current_tab in tabs:
+                try:
+                    current_name = current_tab.ele('xpath:.//span').text.strip()
+                except Exception as e:
+                    logger.warning(f"读取当前职位标签失败: {e}")
+                    continue
+                if current_name == tab_name:
+                    tab = current_tab
+                    break
+
+            if not tab:
+                logger.warning(f"未找到职位标签: {tab_name}")
+                continue
+
+            logger.info(f"正在采集标签: {tab_name} ({i + 1}/{len(tab_names)})")
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             
             # 更新配置中的职位名称以匹配当前标签
