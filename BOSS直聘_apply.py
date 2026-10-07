@@ -383,7 +383,7 @@ class JobParser:
 
     # 字段顺序定义（用于统一输出格式）
     FIELD_ORDER = [
-        '序号', '数据采集时间', '职位状态', '职位标题', '薪资', 'tag-icon', '全部标签', '工作城市', '工作区域', '工作地点',
+        '序号', '数据采集时间', '职位状态', '职位标题', '薪资-0', '薪资', 'tag-icon', '全部标签', '工作城市', '工作区域', '工作地点',
         '经验要求', '学历要求', '岗位标签', '职位描述', '职位详情链接', '职位唯一ID', '公司名称',
         '公司详情链接', '融资情况', '公司规模', '所属行业', '工商-公司名称', '工商-法定代表人', '工商-成立日期',
         '工商-企业类型', '工商-经营状态', '工商-注册资金', '工商-工作地址', '招聘负责人', '活跃状态', '招聘者职位'
@@ -564,7 +564,7 @@ class JobParser:
         if company_link_elem:
             href = company_link_elem.attr('href')
             if href:
-                job['公司详情链接'] = 'https://www.zhipin.com' + href if not href.startswith('http') else href
+                job['公司详情链接'] = 'https://www.zhipin.com' + href if not href.startswith('http') and not href.startswith('javascript') else href
 
         return job if job['职位名称'] else None
 
