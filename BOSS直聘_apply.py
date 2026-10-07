@@ -2,7 +2,7 @@
 Time   : 2026/03/02 14:46 周一
 Author : Leo
 Version: v2.0
-Desc   : Boss直聘数据采集工具 - DrissionPage自动化实现
+Desc   : {平台}数据采集工具 - DrissionPage自动化实现
 
          【核心功能】
          ⚡ 职位搜索 - 支持城市代码自动获取，智能滚动加载，自动去重
@@ -25,8 +25,8 @@ Desc   : Boss直聘数据采集工具 - DrissionPage自动化实现
          └─ {城市}_{日期}/
             └─ {职位}/
                ├─ {职位}_list_{时间戳}.json                    # 职位列表
-               ├─ BOSS直聘_{城市}_{职位}_{时间戳}.json          # 详情数据JSON
-               ├─ BOSS直聘_{城市}_{职位}_{时间戳}.xlsx          # 详情数据Excel
+               ├─ {平台}_{城市}_{职位}_{时间戳}.json            # 详情数据JSON
+               ├─ {平台}_{城市}_{职位}_{时间戳}.xlsx            # 详情数据Excel
                ├─ html_debug/                                   # HTML源码调试目录
                │  ├─ 01_首页_{时间戳}.html
                │  ├─ 02_搜索结果页_{时间戳}.html
@@ -62,6 +62,7 @@ from DrissionPage import ChromiumPage
 @dataclass
 class Config:
     """统一配置类"""
+    platform: str = "快速求职"  # 平台名称，用于实际输出文件名
     # 搜索配置
     job_name: str = "数据"  # 搜索的职位名称
     city_name: str = "上海"  # 搜索城市名称
@@ -79,8 +80,8 @@ class Config:
     max_html_save: int = 5  # 最多保存多少个详情页HTML（避免太多文件）
 
     # Cookie配置
-    cookie_refresh: bool = False  # 是否重新登录BOSS直聘刷新Cookie信息（点开登录界面，扫码登录后就可以不用管了）
-    cookie_wait: int = 5  # 登录BOSS直聘页面等待时间
+    cookie_refresh: bool = False  # 是否重新登录{平台}刷新Cookie信息（点开登录界面，扫码登录后就可以不用管了）
+    cookie_wait: int = 5  # 登录{平台}页面等待时间
     cookie_file: str = 'cookies.json'  # Cookie文件
 
     # 目录配置
@@ -468,7 +469,7 @@ class SQLiteManager:
                     job_dir = os.path.join(date_root, current_job)
                     if not os.path.isdir(job_dir):
                         continue
-                    file_pattern = f'BOSS直聘_{self.config.city_name}_{current_job}_*.json'
+                    file_pattern = f'{self.config.platform}_{self.config.city_name}_{current_job}_*.json'
                     for file_path in glob.glob(os.path.join(job_dir, file_pattern)):
                         match = re.search(r'_(\d{8}_\d{6})\.json$', os.path.basename(file_path))
                         if not match:
@@ -514,7 +515,7 @@ class SQLiteManager:
 
 
 class CityCodeManager:
-    """城市代码管理器 - 从BOSS直聘API获取城市代码"""
+    """城市代码管理器 - 从{平台}API获取城市代码"""
 
     def __init__(self):
         self.cache = {}  # 缓存已获取的城市代码
@@ -527,7 +528,7 @@ class CityCodeManager:
             return self.cache[city_name]
 
         try:
-            logger.debug(f"正在从Boss直聘API获取城市 [{city_name}] 的代码...")
+            logger.debug("正在从{平台}API获取城市 [{}] 的代码...".format(city_name))
             response = requests.get("https://www.zhipin.com/wapi/zpCommon/data/city.json")
 
             if response.status_code != 200:
@@ -650,7 +651,7 @@ class JobParser:
         logger.info(f"已缓存 {len(self.job_list_cache)} 个职位列表信息")
 
     def clean_text(self, text: str) -> str:
-        """清洗文本（去除多余空格，保留换行符，并移除BOSS直聘相关品牌字符）"""
+        """清洗文本（去除多余空格，保留换行符，并移除{平台}相关品牌字符）"""
         if not text:
             return ''
 
@@ -668,7 +669,7 @@ class JobParser:
         pattern = re.compile(
             r'(?:来自\s*)?boss\s*(?:直聘)?|直聘',
             re.IGNORECASE  # 忽略大小写
-        )  # 匹配各种形式的BOSS直聘及相关组合
+        )  # 匹配各种形式的{平台}及相关组合
         # 替换所有匹配（跨行处理）
         cleaned = pattern.sub('', cleaned)
         # 清理替换后可能留下的多余标点符号（每行单独处理，避免跨行影响）
@@ -1078,7 +1079,7 @@ class JobScraper:
 
         try:
             # 访问职位页
-            logger.info("正在访问BOSS直聘职位页...")
+            logger.info("正在访问{平台}职位页...")
             self.page.get("https://www.zhipin.com/web/geek/jobs")
             # 等待搜索框出现（匹配class或placeholder符合的input元素）
             self.page.wait.ele_displayed('xpath://div[@class="expect-list has-add no-part"]', timeout=10)
@@ -1354,7 +1355,7 @@ class JobScraper:
             logger.error(f"保存进度失败: {e}")
 
     def save_results(self, timestamp: str):
-        """保存最终结果：BOSS直聘_{城市}_{职位}_{时间戳}.json 和 .xlsx"""
+        """保存最终结果：{平台}_{城市}_{职位}_{时间戳}.json 和 .xlsx"""
         # 最终导出始终以指定时间戳的全部增量进度文件为准。
         self.current_job_details = self.merge_progress_files(timestamp)
         if not self.current_job_details:
@@ -1371,14 +1372,14 @@ class JobScraper:
         # 保存JSON
         json_file = os.path.join(
             self.file_manager.data_dir,
-            f"BOSS直聘_{self.config.city_name}_{self.config.job_name}_{timestamp}.json"
+            f"{self.config.platform}_{self.config.city_name}_{self.config.job_name}_{timestamp}.json"
         )
         self.file_manager.save_json(ordered, json_file)
 
         # 保存Excel
         excel_file = os.path.join(
             self.file_manager.data_dir,
-            f"BOSS直聘_{self.config.city_name}_{self.config.job_name}_{timestamp}.xlsx"
+            f"{self.config.platform}_{self.config.city_name}_{self.config.job_name}_{timestamp}.xlsx"
         )
         df = pd.DataFrame(ordered)
         df.to_excel(excel_file, index=False)
@@ -1427,7 +1428,7 @@ def main():
 
     # 添加启动日志
     logger.info("=" * 50)
-    logger.info(f"Boss直聘爬虫启动 v2.0")
+    logger.info(f"{config.platform}爬虫启动 v2.0")
     logger.info(f"配置信息: 职位={config.job_name}, 城市={config.city_name}")
     logger.info(f"HTML调试模式: {'开启' if config.save_html_debug else '关闭'}")
 
@@ -1453,7 +1454,7 @@ def main():
         logger.info(f"HTML调试目录: {scraper.file_manager.html_debug_dir}")
 
     try:
-        # 是否重新登录BOSS直聘刷新Cookie
+        # 是否重新登录{平台}刷新Cookie
         config.cookie_refresh = True
         if config.cookie_refresh:
             scraper.page_operator.get_cookie(url='https://www.zhipin.com', timeout=config.cookie_wait)
