@@ -1290,7 +1290,7 @@ def main():
                     continue
                 scraper.save_results(timestamp)
 
-            elif mode.startswith("4 "):
+            elif mode == "4" or mode.startswith("4 "):
                 # 参数顺序：开始时间、结束时间、职位名称；0表示省略参数。
                 parameters = mode[2:].split()
                 if len(parameters) > 3:
